@@ -16,6 +16,7 @@ All text above, and the splash screen below must be included in any redistributi
 // This version uses the internal data queing so you can treat it like Serial (kinda)!
 
 #include <SPI.h>
+#include <Servo.h>
 #include "Adafruit_BLE_UART.h"
 
 // Connect CLK/MISO/MOSI to hardware SPI
@@ -23,8 +24,11 @@ All text above, and the splash screen below must be included in any redistributi
 #define ADAFRUITBLE_REQ 10
 #define ADAFRUITBLE_RDY 2     // This should be an interrupt pin, on Uno thats #2 or #3
 #define ADAFRUITBLE_RST 9
+#define SERVO_CTRL 5
 
 Adafruit_BLE_UART BTLEserial = Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RDY, ADAFRUITBLE_RST);
+
+Servo servo;
 /**************************************************************************/
 /*!
     Configure the Arduino and start advertising with the radio
@@ -34,11 +38,10 @@ void setup(void)
 { 
   Serial.begin(9600);
   while(!Serial); // Leonardo/Micro should wait for serial init
-  Serial.println(F("Adafruit Bluefruit Low Energy nRF8001 Print echo demo"));
-
-  // BTLEserial.setDeviceName("NEWNAME"); /* 7 characters max! */
+  BTLEserial.setDeviceName("RxBLE"); /* 7 characters max! */
 
   BTLEserial.begin();
+  servo.attach(SERVO_CTRL);
 }
 
 /**************************************************************************/
@@ -72,32 +75,21 @@ void loop()
   }
 
   if (status == ACI_EVT_CONNECTED) {
-    // Lets see if there's any data for us!
-    if (BTLEserial.available()) {
-      Serial.print("* "); Serial.print(BTLEserial.available()); Serial.println(F(" bytes available from BTLE"));
-    }
-    // OK while we still have something to read, get a character and print it out
+
+    //Read any input we've received
     while (BTLEserial.available()) {
       char c = BTLEserial.read();
+      if(c < '0' || c > '9')
+      {
+        Serial.print("Received invalid value\n");
+        continue;
+      }
+      Serial.print("Received value:");
       Serial.print(c);
-    }
-
-    // Next up, see if we have any data to get from the Serial console
-
-    if (Serial.available()) {
-      // Read a line from Serial
-      Serial.setTimeout(100); // 100 millisecond timeout
-      String s = Serial.readString();
-
-      // We need to convert the line to bytes, no more than 20 at this time
-      uint8_t sendbuffer[20];
-      s.getBytes(sendbuffer, 20);
-      char sendbuffersize = min(20, s.length());
-
-      Serial.print(F("\n* Sending -> \"")); Serial.print((char *)sendbuffer); Serial.println("\"");
-
-      // write the data
-      BTLEserial.write(sendbuffer, sendbuffersize);
+      Serial.print("\n");
+      int angle = (180/9) * (int)(c - '0');
+      servo.write(angle);
+      
     }
   }
 }
